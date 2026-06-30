@@ -3,27 +3,18 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useLanguage } from '@/components/LanguageContext';
-import toast from 'react-hot-toast';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [error, setError] = useState('');
   const router = useRouter();
   const { lang, setLang, t } = useLanguage();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    if (username === 'manager') {
-      toast.success('Добро пожаловать, Менеджер! 👋');
-      router.push('/manager');
-    } else if (username.startsWith('mechanic')) {
-      toast.success('Добро пожаловать, Механик! 👋');
-      router.push('/mechanic');
-    } else {
-      setError('Неверный логин. Используйте: manager или mechanic1');
-    }
+    if (username === 'manager') router.push('/manager');
+    else if (username.startsWith('mechanic')) router.push('/mechanic');
+    else alert('Invalid credentials for prototype. Use manager or mechanic1');
   };
 
   return (
@@ -61,11 +52,6 @@ export default function LoginPage() {
               required 
             />
           </div>
-          {error && (
-            <div style={{ color: '#f87171', fontSize: '0.9rem', marginTop: '0.5rem', padding: '0.75rem', background: 'rgba(239,68,68,0.1)', borderRadius: '8px', border: '1px solid rgba(239,68,68,0.3)' }}>
-              ⚠️ {error}
-            </div>
-          )}
           <button type="submit" className="btn btn-primary" style={{ width: '100%', marginTop: '1rem' }}>
             {t.signIn}
           </button>
