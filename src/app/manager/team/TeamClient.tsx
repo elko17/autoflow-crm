@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowLeft, UserPlus, UserX, UserCheck, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
@@ -9,13 +9,9 @@ import { createMechanic, setMechanicActive, type StaffRow } from '@/lib/actions'
 
 export default function TeamClient({ initialStaff }: { initialStaff: StaffRow[] }) {
   const router = useRouter();
-  const [staff, setStaff] = useState(initialStaff);
+  const staff = initialStaff;
   const [loading, setLoading] = useState(false);
   const [changingId, setChangingId] = useState<number | null>(null);
-
-  useEffect(() => {
-    setStaff(initialStaff);
-  }, [initialStaff]);
 
   async function handleCreate(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -58,9 +54,6 @@ export default function TeamClient({ initialStaff }: { initialStaff: StaffRow[] 
     setChangingId(member.id);
     try {
       await setMechanicActive(member.id, nextActive);
-      setStaff(current => current.map(item =>
-        item.id === member.id ? { ...item, is_active: nextActive } : item
-      ));
       toast.success(nextActive ? 'Доступ восстановлен' : 'Доступ отключён');
       router.refresh();
     } catch {
