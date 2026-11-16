@@ -2,10 +2,10 @@
 import { useLanguage } from '@/components/LanguageContext';
 import Navbar from '@/components/Navbar';
 import { useState } from 'react';
-import { updateOrderStatus } from '@/lib/actions';
+import { updateOrderStatus, type OrderRow } from '@/lib/actions';
 import toast from 'react-hot-toast';
 
-export default function MechanicClient({ initialOrders }: { initialOrders: any[] }) {
+export default function MechanicClient({ initialOrders }: { initialOrders: OrderRow[] }) {
   const { t } = useLanguage();
   const [orders, setOrders] = useState(initialOrders);
 
