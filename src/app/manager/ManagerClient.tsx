@@ -20,6 +20,15 @@ type ManagerOrder = {
   status: string;
 };
 
+const escapeHtml = (value: unknown) =>
+  String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] ?? character);
+
 export default function ManagerClient({ initialOrders }: { initialOrders: ManagerOrder[] }) {
   const { t } = useLanguage();
   const router = useRouter();
@@ -77,10 +86,10 @@ export default function ManagerClient({ initialOrders }: { initialOrders: Manage
             <h1>AutoFlow CRM</h1>
             <p>Квитанция к заказу #${order.id}</p>
           </div>
-          <div class="row"><span>Клиент:</span> <span>${order.clientName} (${order.phone})</span></div>
-          <div class="row"><span>Автомобиль:</span> <span>${order.brand} ${order.model} [${order.plate}]</span></div>
-          <div class="row"><span>Проблема:</span> <span>${order.problem}</span></div>
-          <div class="row"><span>Механик:</span> <span>${order.mechanicName || '—'}</span></div>
+          <div class="row"><span>Клиент:</span> <span>${escapeHtml(order.clientName)} (${escapeHtml(order.phone)})</span></div>
+          <div class="row"><span>Автомобиль:</span> <span>${escapeHtml(order.brand)} ${escapeHtml(order.model)} [${escapeHtml(order.plate)}]</span></div>
+          <div class="row"><span>Проблема:</span> <span>${escapeHtml(order.problem)}</span></div>
+          <div class="row"><span>Механик:</span> <span>${escapeHtml(order.mechanicName || '—')}</span></div>
           <div class="total">Итого: ${order.price} ${t.som}</div>
           <script>window.print();</script>
         </body>
