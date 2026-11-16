@@ -7,7 +7,20 @@ import { deleteOrder } from '@/lib/actions';
 import { Search, Plus, Trash2, Printer, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function ManagerClient({ initialOrders }: { initialOrders: any[] }) {
+type ManagerOrder = {
+  id: number;
+  clientName: string;
+  phone: string;
+  brand: string;
+  model: string;
+  plate: string;
+  problem: string;
+  mechanicName: string | null;
+  price: number;
+  status: string;
+};
+
+export default function ManagerClient({ initialOrders }: { initialOrders: ManagerOrder[] }) {
   const { t } = useLanguage();
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
@@ -45,7 +58,7 @@ export default function ManagerClient({ initialOrders }: { initialOrders: any[] 
     }
   };
 
-  const handlePrint = (order: any) => {
+  const handlePrint = (order: ManagerOrder) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     printWindow.document.write(`
