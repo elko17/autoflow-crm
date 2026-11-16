@@ -12,16 +12,12 @@ Authentication uses PostgreSQL-backed accounts and sessions. Passwords are hashe
 
 1. Create a PostgreSQL database.
 2. Copy `.env.example` to `.env.local` and set `DATABASE_URL`.
-3. Apply the schema:
+3. Install dependencies with `npm install`.
+4. Apply both database migrations in order:
 
    ```bash
    psql "$DATABASE_URL" -f db/migrations/001_auth.sql
-   ```
-
-4. Install dependencies:
-
-   ```bash
-   npm install
+   psql "$DATABASE_URL" -f db/migrations/002_crm_data.sql
    ```
 
 5. Create the first manager account:
@@ -53,4 +49,4 @@ Authentication uses PostgreSQL-backed accounts and sessions. Passwords are hashe
 - Keep PostgreSQL private and use a least-privilege database user.
 - Configure backups, monitoring, and a scheduled cleanup for expired rows:
   `DELETE FROM auth_sessions WHERE expires_at < NOW();`
-- The CRM's existing orders/clients/cars demo data is still held in the in-memory prototype store. This authentication migration does not make that operational data durable or multi-instance safe; migrate those entities to PostgreSQL before using the CRM for real customer operations.
+- Clients, vehicles, and work orders are stored in PostgreSQL with foreign keys, indexes, and transactional order creation. A new database starts empty; create staff accounts and add customer/vehicle records through the manager dashboard. Back up this database before launch.
