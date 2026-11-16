@@ -4,7 +4,7 @@ import Navbar from '@/components/Navbar';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { deleteOrder } from '@/lib/actions';
-import { Search, Plus, Trash2, Printer } from 'lucide-react';
+import { Search, Plus, Trash2, Printer, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export default function ManagerClient({ initialOrders }: { initialOrders: any[] }) {
@@ -107,6 +107,9 @@ export default function ManagerClient({ initialOrders }: { initialOrders: any[] 
           <h2>{t.orders}</h2>
           
           <div style={{ display: 'flex', gap: '1rem', flex: 1, justifyContent: 'flex-end', minWidth: '300px' }}>
+            <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }} onClick={() => router.push('/manager/team')}>
+              <Users size={18} /> Сотрудники
+            </button>
             <div style={{ position: 'relative', maxWidth: '300px', width: '100%' }}>
               <Search style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} size={20} />
               <input 
