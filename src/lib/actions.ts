@@ -1,69 +1,114 @@
 'use server';
-import { db } from './db';
 
-export async function getOrders() {
-  return db.orders.map((o: any) => {
-    const client = db.clients.find((c: any) => c.id === o.client_id);
-    const car = db.cars.find((c: any) => c.id === o.car_id);
-    const mechanic = db.users.find((u: any) => u.id === o.mechanic_id);
-    return {
-      ...o,
-      clientName: client?.name,
-      phone: client?.phone,
-      brand: car?.brand,
-      model: car?.model,
-      plate: car?.plate,
-      mechanicName: mechanic?.name
-    };
-  }).sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+import { requireRole } from './auth';
+import { authQuery, authTransaction } from './auth-db';
+
+type OrderRow = {
+  id: number;
+  client_id: number;
+  car_id: number;
+  mechanic_id: number | null;
+  problem: string;
+  status: string;
+  price: number;
+  created_at: Date;
+  clientName: string;
+  phone: string;
+  brand: string;
+  model: string;
+  plate: string;
+  mechanicName: string | null;
+};
+
+const ORDER_SELECT = `
+  SELECT o.id, o.client_id, o.car_id, o.mechanic_id, o.problem, o.status,
+         o.price::float8 AS price, o.created_at,
+         c.name AS "clientName", c.phone,
+         car.brand, car.model, car.plate,
+         u.full_name AS "mechanicName"
+  FROM crm_orders o
+  JOIN crm_clients c ON c.id = o.client_id
+  JOIN crm_cars car ON car.id = o.car_id
+  LEFT JOIN auth_users u ON u.id = o.mechanic_id
+`;
+
+export async function getOrders(): Promise<OrderRow[]> {
+  await requireRole('manager');
+  const result = await authQuery<OrderRow>(ORDER_SELECT + ' ORDER BY o.created_at DESC');
+  return result.rows;
 }
 
-export async function getMechanicOrders(mechanicId: number) {
-  const orders = await getOrders();
-  return orders.filter((o: any) => o.mechanic_id === mechanicId);
+export async function getMechanicOrders(): Promise<OrderRow[]> {
+  const user = await requireRole('mechanic');
+  const result = await authQuery<OrderRow>(ORDER_SELECT + ' WHERE o.mechanic_id = $1 ORDER BY o.created_at DESC', [user.id]);
+  return result.rows;
 }
 
 export async function updateOrderStatus(orderId: number, status: string) {
-  const order = db.orders.find((o: any) => o.id === orderId);
-  if (order) order.status = status;
+  if (!Number.isInteger(orderId) || !['new', 'in_progress', 'done'].includes(status)) throw new Error('INVALID_INPUT');
+  const user = await requireRole('mechanic');
+  const result = await authQuery(
+    'UPDATE crm_orders SET status = $1, updated_at = NOW() WHERE id = $2 AND mechanic_id = $3',
+    [status, orderId, user.id],
+  );
+  if (result.rowCount !== 1) throw new Error('FORBIDDEN');
 }
 
 export async function getMechanics() {
-  return db.users.filter((u: any) => u.role === 'mechanic');
+  await requireRole('manager');
+  const result = await authQuery(
+    `SELECT id, username, role, full_name AS name
+     FROM auth_users WHERE role = 'mechanic' AND is_active = TRUE ORDER BY full_name`,
+  );
+  return result.rows;
 }
 
 export async function deleteOrder(orderId: number) {
-  db.orders = db.orders.filter((o: any) => o.id !== orderId);
+  await requireRole('manager');
+  if (!Number.isInteger(orderId)) throw new Error('INVALID_INPUT');
+  await authQuery('DELETE FROM crm_orders WHERE id = $1', [orderId]);
 }
 
 export async function createOrder(data: FormData) {
-  const phone = data.get('phone') as string;
-  const clientName = data.get('clientName') as string;
-  const brand = data.get('brand') as string;
-  const model = data.get('model') as string;
-  const plate = data.get('plate') as string;
-  const problem = data.get('problem') as string;
-  const price = Number(data.get('price')) || 0;
-  const mechanicId = data.get('mechanicId') ? Number(data.get('mechanicId')) : null;
+  await requireRole('manager');
+  const phone = String(data.get('phone') ?? '').trim();
+  const clientName = String(data.get('clientName') ?? '').trim();
+  const brand = String(data.get('brand') ?? '').trim();
+  const model = String(data.get('model') ?? '').trim();
+  const plate = String(data.get('plate') ?? '').trim().toUpperCase();
+  const problem = String(data.get('problem') ?? '').trim();
+  const price = Number(data.get('price'));
+  const mechanicValue = data.get('mechanicId');
+  const mechanicId = mechanicValue ? Number(mechanicValue) : null;
 
-  db.lastClientId++;
-  const clientId = db.lastClientId;
-  db.clients.push({ id: clientId, name: clientName, phone });
+  if (!clientName || !phone || !brand || !model || !plate || !problem ||
+      clientName.length > 120 || phone.length > 30 || brand.length > 80 ||
+      model.length > 80 || plate.length > 20 || problem.length > 2000 ||
+      !Number.isFinite(price) || price < 0 || price > 100_000_000 ||
+      (mechanicId !== null && !Number.isInteger(mechanicId))) {
+    throw new Error('INVALID_INPUT');
+  }
 
-  db.lastCarId++;
-  const carId = db.lastCarId;
-  db.cars.push({ id: carId, client_id: clientId, brand, model, plate });
-
-  db.lastOrderId++;
-  const orderId = db.lastOrderId;
-  db.orders.push({
-    id: orderId,
-    client_id: clientId,
-    car_id: carId,
-    mechanic_id: mechanicId,
-    problem,
-    status: 'new',
-    price,
-    created_at: new Date().toISOString()
+  await authTransaction(async client => {
+    if (mechanicId !== null) {
+      const mechanic = await client.query(
+        `SELECT id FROM auth_users WHERE id = $1 AND role = 'mechanic' AND is_active = TRUE`,
+        [mechanicId],
+      );
+      if (!mechanic.rowCount) throw new Error('INVALID_MECHANIC');
+    }
+    const clientResult = await client.query(
+      'INSERT INTO crm_clients (name, phone) VALUES ($1, $2) RETURNING id',
+      [clientName, phone],
+    );
+    const carResult = await client.query(
+      'INSERT INTO crm_cars (client_id, brand, model, plate) VALUES ($1, $2, $3, $4) RETURNING id',
+      [clientResult.rows[0].id, brand, model, plate],
+    );
+    await client.query(
+      `INSERT INTO crm_orders (client_id, car_id, mechanic_id, problem, status, price)
+       VALUES ($1, $2, $3, $4, 'new', $5)`,
+      [clientResult.rows[0].id, carResult.rows[0].id, mechanicId, problem, price],
+    );
   });
 }

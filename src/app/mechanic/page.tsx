@@ -1,9 +1,14 @@
+import { redirect } from 'next/navigation';
+import { getCurrentUser } from '@/lib/auth';
 import { getMechanicOrders } from '@/lib/actions';
 import MechanicClient from './MechanicClient';
 
-// For prototype we hardcode mechanicId = 2 (Нурлан, see setup-db.mjs)
+export const dynamic = 'force-dynamic';
+
 export default async function MechanicPage() {
-  const mechanicId = 2; // mechanic1 in setup
-  const orders = await getMechanicOrders(mechanicId);
+  const user = await getCurrentUser();
+  if (!user) redirect('/');
+  if (user.role !== 'mechanic') redirect('/manager');
+  const orders = await getMechanicOrders();
   return <MechanicClient initialOrders={orders} />;
 }
