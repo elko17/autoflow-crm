@@ -4,7 +4,7 @@ import bcrypt from 'bcryptjs';
 import { requireRole } from './auth';
 import { authQuery, authTransaction } from './auth-db';
 
-type OrderRow = {
+export type OrderRow = {
   id: number;
   client_id: number;
   car_id: number;
@@ -64,9 +64,11 @@ export async function updateOrderStatus(orderId: number, status: string) {
   if (result.rowCount !== 1) throw new Error('FORBIDDEN');
 }
 
-export async function getMechanics() {
+export type MechanicOption = { id: number; username: string; role: 'mechanic'; name: string };
+
+export async function getMechanics(): Promise<MechanicOption[]> {
   await requireRole('manager');
-  const result = await authQuery(
+  const result = await authQuery<MechanicOption>(
     `SELECT id, username, role, full_name AS name
      FROM auth_users WHERE role = 'mechanic' AND is_active = TRUE ORDER BY full_name`,
   );
