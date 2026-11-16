@@ -4,10 +4,32 @@ import Navbar from '@/components/Navbar';
 import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { deleteOrder } from '@/lib/actions';
-import { Search, Plus, Trash2, Printer } from 'lucide-react';
+import { Search, Plus, Trash2, Printer, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-export default function ManagerClient({ initialOrders }: { initialOrders: any[] }) {
+type ManagerOrder = {
+  id: number;
+  clientName: string;
+  phone: string;
+  brand: string;
+  model: string;
+  plate: string;
+  problem: string;
+  mechanicName: string | null;
+  price: number;
+  status: string;
+};
+
+const escapeHtml = (value: unknown) =>
+  String(value ?? '').replace(/[&<>"']/g, character => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;',
+  })[character] ?? character);
+
+export default function ManagerClient({ initialOrders }: { initialOrders: ManagerOrder[] }) {
   const { t } = useLanguage();
   const router = useRouter();
   const [orders, setOrders] = useState(initialOrders);
@@ -45,7 +67,7 @@ export default function ManagerClient({ initialOrders }: { initialOrders: any[] 
     }
   };
 
-  const handlePrint = (order: any) => {
+  const handlePrint = (order: ManagerOrder) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
     printWindow.document.write(`
@@ -64,10 +86,10 @@ export default function ManagerClient({ initialOrders }: { initialOrders: any[] 
             <h1>AutoFlow CRM</h1>
             <p>Квитанция к заказу #${order.id}</p>
           </div>
-          <div class="row"><span>Клиент:</span> <span>${order.clientName} (${order.phone})</span></div>
-          <div class="row"><span>Автомобиль:</span> <span>${order.brand} ${order.model} [${order.plate}]</span></div>
-          <div class="row"><span>Проблема:</span> <span>${order.problem}</span></div>
-          <div class="row"><span>Механик:</span> <span>${order.mechanicName || '—'}</span></div>
+          <div class="row"><span>Клиент:</span> <span>${escapeHtml(order.clientName)} (${escapeHtml(order.phone)})</span></div>
+          <div class="row"><span>Автомобиль:</span> <span>${escapeHtml(order.brand)} ${escapeHtml(order.model)} [${escapeHtml(order.plate)}]</span></div>
+          <div class="row"><span>Проблема:</span> <span>${escapeHtml(order.problem)}</span></div>
+          <div class="row"><span>Механик:</span> <span>${escapeHtml(order.mechanicName || '—')}</span></div>
           <div class="total">Итого: ${order.price} ${t.som}</div>
           <script>window.print();</script>
         </body>
@@ -107,6 +129,9 @@ export default function ManagerClient({ initialOrders }: { initialOrders: any[] 
           <h2>{t.orders}</h2>
           
           <div style={{ display: 'flex', gap: '1rem', flex: 1, justifyContent: 'flex-end', minWidth: '300px' }}>
+            <button className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', whiteSpace: 'nowrap' }} onClick={() => router.push('/manager/team')}>
+              <Users size={18} /> Сотрудники
+            </button>
             <div style={{ position: 'relative', maxWidth: '300px', width: '100%' }}>
               <Search style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} size={20} />
               <input 

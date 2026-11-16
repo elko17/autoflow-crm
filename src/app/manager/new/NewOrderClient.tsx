@@ -1,14 +1,14 @@
 'use client';
 import { useLanguage } from '@/components/LanguageContext';
 import Navbar from '@/components/Navbar';
-import { createOrder, getMechanics } from '@/lib/actions';
+import { createOrder, getMechanics, type MechanicOption } from '@/lib/actions';
 import { useRouter } from 'next/navigation';
 import { useState, useEffect } from 'react';
 
 export default function NewOrderPage() {
   const { t } = useLanguage();
   const router = useRouter();
-  const [mechanics, setMechanics] = useState<any[]>([]);
+  const [mechanics, setMechanics] = useState<MechanicOption[]>([]);
 
   useEffect(() => {
     getMechanics().then(setMechanics);
