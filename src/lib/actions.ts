@@ -1,5 +1,6 @@
 'use server';
 
+import bcrypt from 'bcryptjs';
 import { requireRole } from './auth';
 import { authQuery, authTransaction } from './auth-db';
 
@@ -18,6 +19,15 @@ type OrderRow = {
   model: string;
   plate: string;
   mechanicName: string | null;
+};
+
+export type StaffRow = {
+  id: number;
+  username: string;
+  email: string;
+  name: string;
+  is_active: boolean;
+  created_at: Date;
 };
 
 const ORDER_SELECT = `
@@ -61,6 +71,66 @@ export async function getMechanics() {
      FROM auth_users WHERE role = 'mechanic' AND is_active = TRUE ORDER BY full_name`,
   );
   return result.rows;
+}
+
+export async function getStaff(): Promise<StaffRow[]> {
+  await requireRole('manager');
+  const result = await authQuery<StaffRow>(
+    `SELECT id, username, email, full_name AS name, is_active, created_at
+     FROM auth_users WHERE role = 'mechanic' ORDER BY is_active DESC, full_name ASC`,
+  );
+  return result.rows;
+}
+
+export async function createMechanic(input: {
+  username: string;
+  email: string;
+  fullName: string;
+  password: string;
+}) {
+  await requireRole('manager');
+  const username = String(input.username ?? '').trim().toLowerCase();
+  const email = String(input.email ?? '').trim().toLowerCase();
+  const fullName = String(input.fullName ?? '').trim();
+  const password = String(input.password ?? '');
+
+  if (!/^[a-z0-9_]{3,40}$/.test(username) ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254 ||
+      fullName.length < 2 || fullName.length > 120 ||
+      password.length < 12 || password.length > 200) {
+    throw new Error('INVALID_INPUT');
+  }
+
+  const passwordHash = await bcrypt.hash(password, 12);
+  try {
+    await authQuery(
+      `INSERT INTO auth_users (username, email, password_hash, role, full_name)
+       VALUES ($1, $2, $3, 'mechanic', $4)`,
+      [username, email, passwordHash, fullName],
+    );
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      throw new Error('USER_EXISTS');
+    }
+    throw error;
+  }
+}
+
+export async function setMechanicActive(mechanicId: number, active: boolean) {
+  await requireRole('manager');
+  if (!Number.isInteger(mechanicId) || typeof active !== 'boolean') throw new Error('INVALID_INPUT');
+
+  await authTransaction(async client => {
+    const result = await client.query(
+      `UPDATE auth_users SET is_active = $1, updated_at = NOW()
+       WHERE id = $2 AND role = 'mechanic'`,
+      [active, mechanicId],
+    );
+    if (result.rowCount !== 1) throw new Error('NOT_FOUND');
+    if (!active) {
+      await client.query('DELETE FROM auth_sessions WHERE user_id = $1', [mechanicId]);
+    }
+  });
 }
 
 export async function deleteOrder(orderId: number) {
