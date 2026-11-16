@@ -1,5 +1,5 @@
 'use client';
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useSyncExternalStore } from 'react';
 import { dictionaries, Language } from '../lib/dictionaries';
 
 type LanguageContextType = {
@@ -9,32 +9,33 @@ type LanguageContextType = {
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
+const LANGUAGE_EVENT = 'autoflow-language-change';
+
+function subscribeToLanguage(callback: () => void) {
+  window.addEventListener('storage', callback);
+  window.addEventListener(LANGUAGE_EVENT, callback);
+  return () => {
+    window.removeEventListener('storage', callback);
+    window.removeEventListener(LANGUAGE_EVENT, callback);
+  };
+}
+
+function getStoredLanguage(): Language {
+  const saved = window.localStorage.getItem('app_lang') as Language | null;
+  return saved && saved in dictionaries ? saved : 'ru';
+}
+
+function getServerLanguage(): Language {
+  return 'ru';
+}
 
 export const LanguageProvider = ({ children }: { children: React.ReactNode }) => {
-  const [lang, setLang] = useState<Language>('ru');
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-    const saved = localStorage.getItem('app_lang') as Language;
-    if (saved && dictionaries[saved]) {
-      setLang(saved);
-    }
-  }, []);
+  const lang = useSyncExternalStore(subscribeToLanguage, getStoredLanguage, getServerLanguage);
 
   const handleSetLang = (newLang: Language) => {
-    setLang(newLang);
-    localStorage.setItem('app_lang', newLang);
+    window.localStorage.setItem('app_lang', newLang);
+    window.dispatchEvent(new Event(LANGUAGE_EVENT));
   };
-
-  // Avoid hydration mismatch by waiting until mounted before rendering context values that depend on localstorage
-  if (!mounted) {
-    return (
-      <LanguageContext.Provider value={{ lang: 'ru', setLang: handleSetLang, t: dictionaries['ru'] }}>
-        <div style={{ visibility: 'hidden' }}>{children}</div>
-      </LanguageContext.Provider>
-    );
-  }
 
   return (
     <LanguageContext.Provider value={{ lang, setLang: handleSetLang, t: dictionaries[lang] }}>
